@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>抽選参加デジタルチケット</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #fdf6ec;
+            color: #4a3728;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+        }
+        .card {
+            background-color: #ffffff;
+            border: 3px solid #f59e0b;
+            border-radius: 20px;
+            padding: 30px 20px;
+            width: 85%;
+            max-width: 400px;
+            box-shadow: 0 10px 20px rgba(245, 158, 11, 0.15);
+        }
+        h1 {
+            font-size: 1.8rem;
+            color: #d97706;
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+        .desc {
+            font-size: 0.95rem;
+            color: #78350f;
+            margin-bottom: 25px;
+            line-height: 1.5;
+        }
+        #qrcode {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        #qrcode img {
+            border: 8px solid #fff;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        }
+        .ticket-id {
+            font-size: 0.8rem;
+            color: #9ca3af;
+            margin-top: 15px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h1>デジタル抽選チケット</h1>
+        <p class="desc">スタッフの端末（iPad）に<br>このQRコードをかざしてください。</p>
+        
+        <div id="qrcode"></div>
+        
+        <div class="ticket-id" id="ticket-id-display"></div>
+    </div>
+
+    <script>
+        // 1人1回制限：ブラウザのLocalStorageを利用
+        const STORAGE_KEY = "workshop_user_ticket_id";
+        let userTicketId = localStorage.getItem(STORAGE_KEY);
+
+        if (!userTicketId) {
+            // 初回アクセスの場合は、ランダムなユニークIDを生成
+            const randomStr = Math.random().toString(36).substring(2, 10).toUpperCase();
+            const timestamp = Date.now();
+            userTicketId = `WS-${randomStr}-${timestamp}`;
+            
+            // スマホの保存領域にIDを記憶（以降、リロードしても同じIDが保持される）
+            localStorage.setItem(STORAGE_KEY, userTicketId);
+        }
+
+        // 画面にシリアルIDを表示
+        document.getElementById('ticket-id-display').textContent = `TICKET ID: ${userTicketId}`;
+
+        // ユニークIDをQRコード化して画面に表示
+        new QRCode(document.getElementById("qrcode"), {
+            text: userTicketId,
+            width: 200,
+            height: 200,
+            colorDark : "#4a3728",
+            colorLight : "#ffffff",
+            correctLevel : QRCode.CorrectLevel.H
+        });
+    </script>
+</body>
+</html>
