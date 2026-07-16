@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>抽選参加デジタルチケット</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         body {
             font-family: 'Helvetica Neue', Arial, sans-serif;
@@ -43,6 +42,7 @@
             display: flex;
             justify-content: center;
             margin: 20px 0;
+            min-height: 200px; /* 読み込み前のガタつき防止 */
         }
         #qrcode img {
             border: 8px solid #fff;
@@ -67,33 +67,35 @@
         <div class="ticket-id" id="ticket-id-display"></div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@master/qrcode.min.js"></script>
     <script>
         // 1人1回制限：ブラウザのLocalStorageを利用
         const STORAGE_KEY = "workshop_user_ticket_id";
         let userTicketId = localStorage.getItem(STORAGE_KEY);
 
         if (!userTicketId) {
-            // 初回アクセスの場合は、ランダムなユニークIDを生成
             const randomStr = Math.random().toString(36).substring(2, 10).toUpperCase();
             const timestamp = Date.now();
             userTicketId = `WS-${randomStr}-${timestamp}`;
-            
-            // スマホの保存領域にIDを記憶（以降、リロードしても同じIDが保持される）
             localStorage.setItem(STORAGE_KEY, userTicketId);
         }
 
         // 画面にシリアルIDを表示
         document.getElementById('ticket-id-display').textContent = `TICKET ID: ${userTicketId}`;
 
-        // ユニークIDをQRコード化して画面に表示
-        new QRCode(document.getElementById("qrcode"), {
-            text: userTicketId,
-            width: 200,
-            height: 200,
-            colorDark : "#4a3728",
-            colorLight : "#ffffff",
-            correctLevel : QRCode.CorrectLevel.H
-        });
+        // QRコードの生成を実行
+        try {
+            new QRCode(document.getElementById("qrcode"), {
+                text: userTicketId,
+                width: 200,
+                height: 200,
+                colorDark : "#4a3728",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+        } catch (e) {
+            console.error("QRコード生成エラー:", e);
+        }
     </script>
 </body>
 </html>
