@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ワークショップ抽選受付システム</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #fdf6ec;
+            color: #4a3728;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        #container {
+            text-align: center;
+            width: 90%;
+            max-width: 650px;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+        h1 {
+            font-size: 2.2rem;
+            color: #d97706;
+            margin-bottom: 20px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.05);
+        }
+        .pattern-box {
+            background-color: #ffffff;
+            border: 2px solid #f59e0b;
+            border-radius: 15px;
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: transform 0.2s, background-color 0.2s, box-shadow 0.2s;
+            text-align: left;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(245, 158, 11, 0.05);
+        }
+        .pattern-box:hover {
+            background-color: #fffbeb;
+            transform: scale(1.01);
+            box-shadow: 0 6px 12px rgba(245, 158, 11, 0.1);
+        }
+        
+        /* 受付終了・満枠時のスタイル */
+        .pattern-box.ended {
+            background-color: #f3f4f6;
+            border-color: #d1d5db;
+            cursor: not-allowed;
+            box-shadow: none;
+            opacity: 0.7;
+        }
+        .pattern-box.ended:hover {
+            background-color: #f3f4f6;
+            transform: none;
+            box-shadow: none;
+        }
+        .pattern-box.ended .pattern-title { color: #6b7280; }
+        .pattern-box.ended .pattern-info { color: #9ca3af; }
+
+        .pattern-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #b45309;
+        }
+        .pattern-info {
+            font-size: 0.95rem;
+            color: #78350f;
+            margin-top: 4px;
+            opacity: 0.85;
+        }
+        .arrow {
+            font-size: 1.5rem;
+            color: #f59e0b;
+            font-weight: bold;
+        }
+        
+        .end-label {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #dc2626;
+            background-color: #fee2e2;
+            padding: 4px 12px;
+            border-radius: 20px;
+            border: 1px solid #fca5a5;
+        }
+
+        /* ポップアップ共通 */
+        .overlay-screen {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 10;
+        }
+
+        /* QRスキャン画面 */
+        .scan-bg {
+            background-color: rgba(0, 0, 0, 0.85);
+            color: white;
+        }
+        #reader {
+            width: 100%;
+            max-width: 450px;
+            background-color: #000;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        .scan-title {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #f59e0b;
+        }
+        .scan-desc {
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+            color: #e5e7eb;
+        }
+        .btn-cancel-scan {
+            margin-top: 25px;
+            padding: 12px 40px;
+            font-size: 1.1rem;
+            background-color: #4b5563;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+        }
+
+        /* 抽選中・結果画面 */
+        .loading-bg { background-color: #fdf6ec; }
+        .spinner {
+            width: 80px; height: 80px;
+            border: 8px solid rgba(245, 158, 11, 0.2);
+            border-top: 8px solid #d97706;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 30px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .loading-text { font-size: 2rem; font-weight: bold; color: #b45309; letter-spacing: 0.1em; }
+        
+        .win-bg { background-color: #ecfdf5; border: 5px solid #10b981; color: #065f46; }
+        .lose-bg { background-color: #fff5f5; border: 5px solid #f87171; color: #991b1b; }
+        .error-bg { background-color: #fef3c7; border: 5px solid #d97706; color: #78350f; } /* 重複エラー用 */
+        
+        .result-title { font-size: 3rem; font-weight: bold; margin-bottom: 20px; text-align: center; }
+        .win-text { color: #047857; }
+        .lose-text { color: #dc2626; }
+        .error-text { color: #b45309; }
+        
+        .info-text { font-size: 1.5rem; margin: 10px 0; line-height: 1.6; text-align: center; }
+        .win-bg .info-text { color: #065f46; }
+        .lose-bg .info-text { color: #7f1d1d; }
+        .error-bg .info-text { color: #78350f; font-weight: bold; }
+        
+        .seat-text { font-size: 0.8rem; color: #9ca3af; margin-top: 30px; text-align: center; font-weight: normal; }
+
+        /* 管理用デバッグ情報（極小・極薄） */
+        #debug-info { 
+            position: absolute; 
+            bottom: 5px; 
+            left: 10px; 
+            font-size: 0.65rem;     
+            color: #c7c1b8;         
+            opacity: 0.25;          
+            text-align: left; 
+            line-height: 1.3; 
+            pointer-events: none; 
+        }
+
+        /* 緊急パスボタン（ネット・カメラトラブル用の管理者スキップ） */
+        .bypass-btn {
+            background-color: transparent;
+            color: #d1d5db;
+            border: 1px solid #d1d5db;
+            padding: 4px 10px;
+            font-size: 0.8rem;
+            border-radius: 10px;
+            margin-top: 15px;
+            cursor: pointer;
+            opacity: 0.6;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="container">
+        <h1>ワークショップ エントリー受付</h1>
+        <p style="color: #78350f; margin-bottom: 20px;">ご希望の時間帯を選択してください</p>
+        
+        <div id="pattern-list"></div>
+    </div>
+
+    <div id="scan-screen" class="overlay-screen scan-bg">
+        <div class="scan-title">チケットをスキャン</div>
+        <div class="scan-desc" id="scan-target-label">【11:00〜12:00】の抽選</div>
+        <div id="reader"></div>
+        <button class="btn-cancel-scan" onclick="stopScanner()">キャンセル</button>
+        <button class="bypass-btn" onclick="bypassScan()">※【緊急】QRなしで強制抽選</button>
+    </div>
+
+    <div id="loading-screen" class="overlay-screen loading-bg">
+        <div class="spinner"></div>
+        <div class="loading-text">抽選中・・・</div>
+    </div>
+
+    <div id="result-screen" class="overlay-screen" onclick="closeResult()">
+        <div class="result-title" id="result-title"></div>
+        <div class="info-text" id="result-meta"></div>
+        <div class="seat-text" id="result-seat"></div>
+        <div style="margin-top: 40px; color: #6b7280; font-size: 1rem;">画面をタップして戻る</div>
+    </div>
+
+    <div id="debug-info"></div>
+
+    <audio id="sound-win" src="win.mp3"></audio>
+    <audio id="sound-lose" src="lose.mp3"></audio>
+
+    <script>
+        // ==========================================
+        // 【マスタデータ定義】
+        // ==========================================
+        const masterData = [
+            { id: 0, label: "11:00～12:00", startRec: "09:45", endRec: "10:45", startWs: "11:00", endWs: "12:00" },
+            { id: 1, label: "12:00～13:00", startRec: "09:45", endRec: "11:45", startWs: "12:00", endWs: "13:00" },
+            { id: 2, label: "14:00～15:00", startRec: "09:45", endRec: "13:45", startWs: "14:00", endWs: "15:00" },
+            { id: 3, label: "15:00～16:00", startRec: "09:45", endRec: "14:45", startWs: "15:00", endWs: "16:00" },
+            { id: 4, label: "16:00～16:45", startRec: "09:45", endRec: "15:45", startWs: "16:00", endWs: "16:45" }
+        ];
+
+        let workshopSlots = {};       
+        let winTimestamps = {};       
+        let selectedId = null;
+        
+        // ★本日抽選に参加したお客様のチケットIDを記録（重複制限リスト）
+        let scannedUserIds = new Set(); 
+
+        let html5QrcodeScanner = null;
+
+        function generateSlots(startTimeStr, endTimeStr) {
+            let slots = [];
+            let current = new Date(`2026/01/01 ${startTimeStr}`);
+            const end = new Date(`2026/01/01 ${endTimeStr}`);
+            
+            while (current < end) {
+                const timeStr = current.toTimeString().substring(0, 5);
+                slots.push({ time: timeStr, name: "1人目" });
+                slots.push({ time: timeStr, name: "2人目" });
+                current.setMinutes(current.getMinutes() + 15);
+            }
+            return slots; 
+        }
+
+        function renderPatternList() {
+            const todayStr = new Date().toLocaleDateString('en-US');
+            const nowTime = new Date().getTime();
+            const listContainer = document.getElementById('pattern-list');
+            listContainer.innerHTML = '';
+
+            masterData.forEach(item => {
+                const endRecTime = new Date(`${todayStr} ${item.endRec}`).getTime();
+                const isTimeEnded = nowTime > endRecTime; 
+                const isFullyBooked = workshopSlots[item.id].length === 0; 
+                const isEnded = isTimeEnded || isFullyBooked;
+
+                const box = document.createElement('div');
+                
+                if (isEnded) {
+                    box.className = 'pattern-box ended';
+                    box.innerHTML = `
+                        <div>
+                            <div class="pattern-title">${item.label}</div>
+                            <div class="pattern-info">受付時間：${item.startRec} 〜 ${item.endRec}</div>
+                        </div>
+                        <div class="end-label">受付終了</div>
+                    `;
+                } else {
+                    box.className = 'pattern-box';
+                    box.onclick = () => startQRScan(item.id); // タップでスキャナー起動へ
+                    box.innerHTML = `
+                        <div>
+                            <div class="pattern-title">${item.label}</div>
+                            <div class="pattern-info">受付時間：${item.startRec} 〜 ${item.endRec}</div>
+                        </div>
+                        <div class="arrow">＞</div>
+                    `;
+                }
+                listContainer.appendChild(box);
+            });
+        }
+
+        function initSystem() {
+            const todayStr = new Date().toLocaleDateString('en-US');
+
+            masterData.forEach(item => {
+                workshopSlots[item.id] = generateSlots(item.startWs, item.endWs);
+
+                winTimestamps[item.id] = [];
+                const startRecTime = new Date(`${todayStr} ${item.startRec}`).getTime();
+                const endRecTime = new Date(`${todayStr} ${item.endRec}`).getTime();
+                const totalCapacity = workshopSlots[item.id].length; 
+
+                const tenMinutesMs = 10 * 60 * 1000;
+                const lastSlotTime = endRecTime - tenMinutesMs;
+
+                if (totalCapacity > 1) {
+                    const interval = (lastSlotTime - startRecTime) / (totalCapacity - 1);
+
+                    for (let i = 0; i < totalCapacity - 1; i++) {
+                        const stepTime = startRecTime + (interval * i);
+                        winTimestamps[item.id].push({ time: stepTime, used: false });
+                    }
+                    winTimestamps[item.id].push({ time: lastSlotTime, used: false });
+                } else {
+                    winTimestamps[item.id].push({ time: startRecTime, used: false });
+                }
+            });
+
+            renderPatternList();
+            updateDebugInfo();
+
+            setInterval(() => {
+                renderPatternList();
+            }, 60000);
+        }
+
+        // ==========================================
+        // 【QRスキャン制御】
+        // ==========================================
+        function startQRScan(id) {
+            selectedId = id;
+            const target = masterData.find(item => item.id === id);
+            document.getElementById('scan-target-label').textContent = `【${target.label}】の抽選`;
+            document.getElementById('scan-screen').style.display = 'flex';
+
+            // iPad・タブレットのフロント（イン）カメラを優先して起動
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            html5QrcodeScanner.start(
+                { facingMode: "user" }, // フロントカメラ優先 (背面にしたい場合は "environment")
+                {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 }
+                },
+                onScanSuccess,
+                onScanFailure
+            ).catch(err => {
+                alert("カメラの起動に失敗しました。カメラのアクセス許可を確認してください。");
+                stopScanner();
+            });
+        }
+
+        function stopScanner() {
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.stop().then(() => {
+                    document.getElementById('scan-screen').style.display = 'none';
+                }).catch(err => {
+                    document.getElementById('scan-screen').style.display = 'none';
+                });
+            } else {
+                document.getElementById('scan-screen').style.display = 'none';
+            }
+        }
+
+        // QRの読み取りに成功した時のイベント
+        function onScanSuccess(decodedText, decodedResult) {
+            stopScanner();
+            
+            // 重複チェック
+            if (scannedUserIds.has(decodedText)) {
+                // すでに本日中に、他の端末や時間帯で抽選済みのシリアルIDの場合
+                showErrorResult("重複制限エラー", "このチケットはすでに抽選済みです。<br>1人1回までとなります。");
+            } else {
+                // 初めてのシリアルIDなら、今回抽選したIDとして即保存
+                scannedUserIds.add(decodedText);
+                startLotteryAnimation(selectedId);
+            }
+        }
+
+        function onScanFailure(error) {
+            // エラーはコンソールに出さず無視して、次のスキャンを待つ
+        }
+
+        // スマホがエラー等の場合のスタッフ用「裏パスボタン」
+        function bypassScan() {
+            stopScanner();
+            startLotteryAnimation(selectedId);
+        }
+
+        // ==========================================
+        // 【抽選処理】
+        // ==========================================
+        function startLotteryAnimation(id) {
+            document.getElementById('loading-screen').style.display = 'flex';
+            setTimeout(() => {
+                document.getElementById('loading-screen').style.display = 'none';
+                executeLottery(id);
+            }, 2500);
+        }
+
+        function executeLottery(id) {
+            const now = new Date().getTime();
+            let isWin = false;
+            let assignedInfo = null;
+            const target = masterData.find(item => item.id === id);
+
+            const availableWin = winTimestamps[id].find(w => !w.used && now >= w.time);
+
+            if (availableWin && workshopSlots[id].length > 0) {
+                availableWin.used = true;
+                assignedInfo = workshopSlots[id].shift(); 
+                isWin = true;
+            }
+
+            showResult(isWin, assignedInfo, target.label);
+            renderPatternList(); 
+            updateDebugInfo();
+        }
+
+        function showResult(isWin, assignedInfo, label) {
+            const screen = document.getElementById('result-screen');
+            const title = document.getElementById('result-title');
+            const meta = document.getElementById('result-meta');
+            const seat = document.getElementById('result-seat');
+
+            if (isWin) {
+                screen.className = 'overlay-screen win-bg';
+                title.textContent = 'おめでとうございます！';
+                title.className = 'result-title win-text';
+                
+                meta.innerHTML = `時間帯 【${label}】 に当選しました！<br><span style="color:#b45309; font-weight:bold; font-size:2.4rem;">参加時間：${assignedInfo.time} 〜</span>`;
+                seat.textContent = `管理用：${assignedInfo.name}`;
+                
+                document.getElementById('sound-win').play().catch(()=>{});
+            } else {
+                screen.className = 'overlay-screen lose-bg';
+                title.textContent = 'ご希望のコンテンツを\nお取りできませんでした';
+                title.className = 'result-title lose-text';
+                meta.textContent = '';
+                seat.textContent = '';
+                
+                document.getElementById('sound-lose').play().catch(()=>{});
+            }
+            screen.style.display = 'flex';
+        }
+
+        // 重複エラー表示用
+        function showErrorResult(errTitle, errMsg) {
+            const screen = document.getElementById('result-screen');
+            const title = document.getElementById('result-title');
+            const meta = document.getElementById('result-meta');
+            const seat = document.getElementById('result-seat');
+
+            screen.className = 'overlay-screen error-bg';
+            title.textContent = errTitle;
+            title.className = 'result-title error-text';
+            meta.innerHTML = errMsg;
+            seat.textContent = '';
+            
+            screen.style.display = 'flex';
+        }
+
+        function closeResult() {
+            document.getElementById('result-screen').style.display = 'none';
+        }
+
+        function updateDebugInfo() {
+            let html = '【現在の残り枠（次に解放される時刻）】<br>';
+            masterData.forEach(item => {
+                const left = workshopSlots[item.id].length;
+                
+                const nextSlotIndex = winTimestamps[item.id].findIndex(w => !w.used);
+                let nextReleaseTime = "解放中";
+                
+                if (nextSlotIndex !== -1) {
+                    const nextTimeObj = new Date(winTimestamps[item.id][nextSlotIndex].time);
+                    nextReleaseTime = nextTimeObj.toTimeString().substring(0, 8);
+                } else {
+                    nextReleaseTime = "満員";
+                }
+
+                html += `${item.label} ⇒ 残り: ${left}枠 (次枠の解放時刻: ${nextReleaseTime})<br>`;
+            });
+            document.getElementById('debug-info').innerHTML = html;
+        }
+
+        initSystem();
+    </script>
+</body>
+</html>
