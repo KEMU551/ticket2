@@ -38,15 +38,16 @@
             margin-bottom: 25px;
             line-height: 1.5;
         }
-        #qrcode {
+        #qrcode-container {
             display: flex;
             justify-content: center;
             margin: 20px 0;
-            min-height: 200px; /* 読み込み前のガタつき防止 */
+            min-height: 200px; /* 領域確保 */
         }
-        #qrcode img {
+        #qrcode {
             border: 8px solid #fff;
             box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+            background-color: #fff;
         }
         .ticket-id {
             font-size: 0.8rem;
@@ -62,12 +63,14 @@
         <h1>デジタル抽選チケット</h1>
         <p class="desc">スタッフの端末（iPad）に<br>このQRコードをかざしてください。</p>
         
-        <div id="qrcode"></div>
+        <div id="qrcode-container">
+            <canvas id="qrcode"></canvas>
+        </div>
         
         <div class="ticket-id" id="ticket-id-display"></div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@master/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
     <script>
         // 1人1回制限：ブラウザのLocalStorageを利用
         const STORAGE_KEY = "workshop_user_ticket_id";
@@ -83,15 +86,15 @@
         // 画面にシリアルIDを表示
         document.getElementById('ticket-id-display').textContent = `TICKET ID: ${userTicketId}`;
 
-        // QRコードの生成を実行
+        // QRコードの直接描画を実行
         try {
-            new QRCode(document.getElementById("qrcode"), {
-                text: userTicketId,
-                width: 200,
-                height: 200,
-                colorDark : "#4a3728",
-                colorLight : "#ffffff",
-                correctLevel : QRCode.CorrectLevel.H
+            var qr = new QRious({
+                element: document.getElementById('qrcode'),
+                value: userTicketId,
+                size: 200,
+                background: '#ffffff',
+                foreground: '#4a3728',
+                level: 'H'
             });
         } catch (e) {
             console.error("QRコード生成エラー:", e);
